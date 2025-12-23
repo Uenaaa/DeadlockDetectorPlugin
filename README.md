@@ -1,68 +1,119 @@
 # DeadLockDetectorPlugin
 
-这是一个用于检测DevEcoStudio并发代码中死锁情况的插件。该插件可以自动检测用户编写的代码中是否存在死锁，并支持鼠标点击特定位置进行检测。
+这是一个用于检测IntelliJ IDEA/DevEcoStudio并发代码中死锁情况的插件。该插件可以检测用户编写的Java代码中是否存在死锁，并提供死锁检测结果。
 
 ## 功能特点
 
-- **自动检测**：用户在编写代码时自动检测是否存在死锁情况
-- **鼠标触发检测**：支持在特定位置点击鼠标进行死锁检测
-- **经典算法**：使用资源分配图(RAG)和深度优先搜索(DFS)算法进行死锁检测
-- **复杂锁场景处理**：支持处理null锁、字符串锁、嵌套锁等多种复杂情况
+- **死锁检测**：使用资源分配图(RAG)和深度优先搜索(DFS)算法进行死锁检测
+- **IDE集成**：在IntelliJ IDEA/DevEcoStudio中通过右键菜单触发死锁检测
+- **代码分析**：解析Java代码结构识别线程创建、同步块和锁的获取模式
+- **循环检测**：检测资源分配图中的循环等待条件
 
 ## 技术实现
 
 - **核心算法**：资源分配图(RAG) + 深度优先搜索(DFS)循环检测
-- **开发框架**：基于IntelliJ IDEA SDK开发，兼容DevEcoStudio
-- **代码分析**：解析PsiElements识别锁的获取和释放模式
-- **可视化界面**：提供直观的死锁可视化效果
+- **开发框架**：基于IntelliJ IDEA SDK开发的插件
+- **代码分析**：使用Psi API解析Java代码结构（线程、同步块、Lambda表达式等）
+- **构建系统**：基于Gradle和IntelliJ Platform Plugin构建
 
 ## 文件结构
 
 ```
-DeadLock/
-├── AppScope/              # 应用范围配置
-├── entry/                 # 主入口模块
-│   ├── src/main/ets/      # ArkTS源代码
-│   ├── src/main/resources/ # 资源文件
-│   └── build-profile.json5 # 构建配置
-├── DeadlockDetector.java  # 死锁检测核心算法
-├── DeadlockTestCases.java # 测试用例
-├── README.md             # 项目说明
-└── .gitignore            # Git忽略文件
+.
+├── .run/                   # Predefined Run/Debug Configurations
+├── build/                  # Output build directory
+├── gradle
+│   ├── wrapper/            # Gradle Wrapper
+├── src                     # Plugin sources
+│   ├── main
+│   │   ├── java/           # Java production sources
+│   │   │   └── com/deadlock/detector/  # Plugin implementation
+│   │   │       ├── action/      # IDE actions
+│   │   │       ├── detector/    # Deadlock detection logic
+│   │   │       └── model/       # Data models
+│   │   └── resources/      # Resources - plugin.xml, icons, messages
+│   │       └── META-INF/
+│   │           └── plugin.xml  # Plugin configuration
+├── .gitignore              # Git ignoring rules
+├── build.gradle.kts        # Gradle build configuration
+├── gradle.properties       # Gradle configuration properties
+├── gradlew                 # *nix Gradle Wrapper script
+├── gradlew.bat             # Windows Gradle Wrapper script
+├── README.md               # README
+└── settings.gradle.kts     # Gradle project settings
 ```
 
 ## 使用方法
 
-1. 在DevEcoStudio中安装该插件
-2. 在代码编辑区域编写并发代码
-3. 插件会自动检测死锁情况并提示
-4. 可以点击特定位置触发死锁检测
+1. 在IntelliJ IDEA/DevEcoStudio中打开该项目
+2. 使用Gradle的`runIde`任务运行插件
+3. 在打开的IDE中编写Java并发代码
+4. 右键点击代码编辑器，选择"Detect Deadlock"菜单项
+5. 插件会分析代码并显示死锁检测结果
 
-## 测试场景
+## 测试用例
 
-- 基本死锁检测
-- 字符串锁死锁检测
-- 嵌套锁死锁检测
-- null锁处理
-- ReentrantLock死锁检测
+项目中包含DeadlockDemo.java测试文件，演示了经典死锁场景：
 
-## 开发环境
+```java
+public class DeadlockDemo {
+    private static final Object resource1 = new Object();
+    private static final Object resource2 = new Object();
 
-- DevEcoStudio
-- Java
-- ArkTS
+    public static void main(String[] args) {
+        // 线程1：先获取resource1，再尝试获取resource2
+        Thread thread1 = new Thread(() -> {
+            synchronized (resource1) {
+                System.out.println("线程1: 已获取资源1");
+                try { Thread.sleep(100); } catch (InterruptedException e) { e.printStackTrace(); }
+                System.out.println("线程1: 尝试获取资源2...");
+                synchronized (resource2) { System.out.println("线程1: 已获取资源2"); }
+            }
+        });
+        
+        // 线程2：先获取resource2，再尝试获取resource1
+        Thread thread2 = new Thread(() -> {
+            synchronized (resource2) {
+                System.out.println("线程2: 已获取资源2");
+                try { Thread.sleep(100); } catch (InterruptedException e) { e.printStackTrace(); }
+                System.out.println("线程2: 尝试获取资源1...");
+                synchronized (resource1) { System.out.println("线程2: 已获取资源1"); }
+            }
+        });
+        
+        thread1.start();
+        thread2.start();
+    }
+}
+```
 
-## 上传到GitHub步骤
+## Plugin Configuration
 
-1. 初始化Git仓库：`git init`
-2. 添加所有文件：`git add .`
-3. 提交代码：`git commit -m "first commit"`
-4. 添加远程仓库：`git remote add origin https://github.com/Jenaaaa/DeadlockDetectorPlugin.git`
-5. 推送代码：`git push -u origin main`
+The plugin configuration file is located at `src/main/resources/META-INF/plugin.xml`. It provides general information about the plugin, its dependencies, extensions, and listeners.
+
+## Running the Plugin
+
+Use the predefined Run/Debug configurations or run the following Gradle task:
+
+```bash
+./gradlew runIde
+```
+
+This will start a new instance of IntelliJ IDEA with the plugin installed.
+
+## Building the Plugin
+
+To build the plugin distribution:
+
+```bash
+./gradlew buildPlugin
+```
+
+The distribution will be created in the `build/distributions` directory.
 
 ## 作者
 
-Jenaaaa
+Uenaaa
 
 ## 许可证
 

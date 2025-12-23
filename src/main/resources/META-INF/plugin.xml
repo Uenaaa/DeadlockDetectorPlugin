@@ -1,0 +1,25 @@
+<idea-plugin>
+    <id>com.deadlock.detector</id>
+    <name>Dead Lock Detector</name>
+    <version>1.0</version>
+    <vendor email="your-email@example.com" url="your-url">Your Name</vendor>
+
+    <idea-version since-build="231.8109.175"/>
+
+    <description><![CDATA[
+        基于Psi API的Java死锁检测插件，支持Synchronized、ReentrantLock等多种锁类型
+    ]]></description>
+
+    <extensions defaultExtensionNs="com.intellij">
+    </extensions>
+
+    <actions>
+        <action id="DeadlockDetector.DetectDeadlockAction"
+                class="com.deadlock.detector.action.DetectDeadlockAction"
+                text="Detect Deadlock"
+                description="检测当前Java文件中的死锁">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+
+</idea-plugin>
