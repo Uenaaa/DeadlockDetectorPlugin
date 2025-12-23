@@ -163,4 +163,64 @@ public class DeadlockDetector {
     public void reset() {
         nodes.clear();
     }
+
+    /**
+     * 生成死锁解决方案建议
+     */
+    public String generateDeadlockSuggestions(List<List<GraphNode>> cycles) {
+        StringBuilder suggestions = new StringBuilder("\n死锁解决方案建议：\n");
+        
+        if (cycles.isEmpty()) {
+            suggestions.append("未检测到死锁，无需解决方案");
+            return suggestions.toString();
+        }
+        
+        // 通用建议
+        suggestions.append("1. 统一锁顺序：确保所有线程按相同顺序获取锁\n");
+        suggestions.append("2. 锁超时机制：使用tryLock()设置超时时间，避免永久等待\n");
+        suggestions.append("3. 减少锁粒度：拆分为更小的锁，减少锁竞争\n");
+        suggestions.append("4. 避免嵌套锁：尽量不要在一个同步块中获取另一个锁\n");
+        suggestions.append("5. 使用并发工具：考虑使用ConcurrentHashMap、Atomic类等替代显式锁\n");
+        
+        // 针对当前死锁的具体建议
+        suggestions.append("\n当前死锁的具体建议：\n");
+        
+        // 分析当前死锁的锁获取顺序
+        for (int i = 0; i < cycles.size(); i++) {
+            List<GraphNode> cycle = cycles.get(i);
+            suggestions.append(String.format("\n死锁循环 %d 的优化建议：\n", i + 1));
+            
+            // 提取锁的获取顺序
+            List<String> lockSequence = new ArrayList<>();
+            for (GraphNode node : cycle) {
+                if (node.getType() == NodeType.RESOURCE) {
+                    lockSequence.add(node.getId());
+                }
+            }
+            
+            // 移除重复的锁
+            List<String> uniqueLocks = new ArrayList<>();
+            for (String lock : lockSequence) {
+                if (!uniqueLocks.contains(lock)) {
+                    uniqueLocks.add(lock);
+                }
+            }
+            
+            if (uniqueLocks.size() >= 2) {
+                suggestions.append("   - 统一锁获取顺序：");
+                for (int j = 0; j < uniqueLocks.size(); j++) {
+                    suggestions.append(uniqueLocks.get(j));
+                    if (j < uniqueLocks.size() - 1) {
+                        suggestions.append(" → ");
+                    }
+                }
+                suggestions.append("\n");
+            }
+            
+            // 嵌套锁建议
+            suggestions.append("   - 考虑重构代码，避免嵌套获取这组锁\n");
+        }
+        
+        return suggestions.toString();
+    }
 }
