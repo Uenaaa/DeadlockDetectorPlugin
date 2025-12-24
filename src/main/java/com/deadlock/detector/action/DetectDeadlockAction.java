@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
+import org.jetbrains.kotlin.psi.KtFile;
 import java.util.ArrayList;
 
 public class DetectDeadlockAction extends AnAction {
@@ -18,8 +19,8 @@ public class DetectDeadlockAction extends AnAction {
     public void actionPerformed(AnActionEvent e) {
         // 1. 获取当前Java文件
         PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
-        if (psiFile == null || !(psiFile instanceof PsiJavaFile)) {
-            Messages.showInfoMessage("请先打开Java文件！", "死锁检测提示");
+        if (psiFile == null || !(psiFile instanceof PsiJavaFile || psiFile instanceof KtFile)) {
+            Messages.showInfoMessage("请先打开Java或Kotlin文件！", "死锁检测提示");
             return;
         }
 

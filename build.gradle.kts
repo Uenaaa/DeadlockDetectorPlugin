@@ -28,7 +28,7 @@ java {
 
 intellij {
     version.set("2023.1") // 使用IntelliJ IDEA版本号代替localPath
-    plugins.set(listOf("java")) // 添加Java插件依赖
+    plugins.set(listOf("java", "org.jetbrains.kotlin")) // 使用完整的Kotlin插件ID
     updateSinceUntilBuild = false // 关闭版本检查
 }
 

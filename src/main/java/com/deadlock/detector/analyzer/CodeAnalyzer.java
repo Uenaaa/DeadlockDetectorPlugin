@@ -10,6 +10,15 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.util.PsiTypesUtil;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.search.GlobalSearchScope;
+import org.jetbrains.kotlin.psi.KtFile;
+import org.jetbrains.kotlin.psi.KtNamedFunction;
+import org.jetbrains.kotlin.psi.KtObjectLiteralExpression;
+import org.jetbrains.kotlin.psi.KtLambdaExpression;
+import org.jetbrains.kotlin.psi.KtCallExpression;
+import org.jetbrains.kotlin.psi.KtValueArgument;
+
+import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
+import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -28,8 +37,8 @@ public class CodeAnalyzer {
     }
 
     /**
-     * 核心入口：解析PsiJavaFile，提取锁信息
-     * @param psiFile Java文件语法树根节点
+     * 核心入口：解析PsiFile（支持Java和Kotlin），提取锁信息
+     * @param psiFile 文件语法树根节点
      * @return 配置好的死锁检测器
      */
     public DeadlockDetector analyzePsiFile(PsiFile psiFile) {
@@ -38,18 +47,211 @@ public class CodeAnalyzer {
         // 重置线程计数器
         threadCounter = 0;
 
-        // 1. 提取所有线程相关的run()方法
-        List<PsiMethod> threadRunMethods = extractThreadRunMethods(psiFile);
-
-        // 2. 逐个分析run方法中的锁操作
-        for (PsiMethod runMethod : threadRunMethods) {
-            String threadId = generateThreadId(runMethod);
-            analyzeRunMethodPsi(runMethod, threadId);
+        // 1. 根据文件类型选择对应的分析方法
+        if (psiFile instanceof PsiJavaFile) {
+            // Java文件分析
+            List<PsiMethod> threadRunMethods = extractThreadRunMethods(psiFile);
+            for (PsiMethod runMethod : threadRunMethods) {
+                String threadId = generateThreadId(runMethod);
+                analyzeRunMethodPsi(runMethod, threadId);
+            }
+        } else if (psiFile instanceof KtFile) {
+            // Kotlin文件分析
+            analyzeKotlinFile((KtFile) psiFile);
         }
 
         return detector;
     }
 
+    /**
+     * 分析Kotlin文件，提取线程和锁信息
+     * @param ktFile Kotlin文件语法树根节点
+     */
+    private void analyzeKotlinFile(KtFile ktFile) {
+        Project project = ktFile.getProject();
+        
+        // 1. 提取Kotlin线程相关的run函数
+        List<PsiElement> kotlinRunFunctions = extractKotlinThreadRunFunctions(ktFile, project);
+        
+        // 2. 逐个分析run函数中的锁操作
+        for (PsiElement runElement : kotlinRunFunctions) {
+            String threadId = generateKotlinThreadId(runElement);
+            analyzeKotlinRunFunction(runElement, threadId, project);
+        }
+    }
+
+    /**
+     * 提取Kotlin中所有线程相关的run函数（支持Runnable/Thread构造函数/Lambda/对象表达式）
+     */
+    private List<PsiElement> extractKotlinThreadRunFunctions(KtFile ktFile, Project project) {
+        List<PsiElement> runFunctions = new ArrayList<>();
+        
+        // 1. 提取普通类实现Runnable接口的run函数
+        Collection<KtNamedFunction> namedFunctions = PsiTreeUtil.findChildrenOfType(ktFile, KtNamedFunction.class);
+        for (KtNamedFunction function : namedFunctions) {
+            if ("run".equals(function.getName()) && function.getValueParameters().isEmpty()) {
+                // 检查是否实现了Runnable接口
+                if (isKotlinRunnableImplementation(function)) {
+                    runFunctions.add(function);
+                }
+            }
+        }
+        
+        // 2. 提取对象表达式中的run函数（object : Runnable { override fun run() {} }）
+        Collection<KtObjectLiteralExpression> objectExpressions = PsiTreeUtil.findChildrenOfType(ktFile, KtObjectLiteralExpression.class);
+        for (KtObjectLiteralExpression objExpr : objectExpressions) {
+            KtNamedFunction runFunction = findRunFunctionInKotlinObject(objExpr);
+            if (runFunction != null) {
+                runFunctions.add(runFunction);
+            }
+        }
+        
+        // 3. 提取Thread构造函数中的Lambda表达式（Thread { ... }）
+        Collection<KtCallExpression> callExpressions = PsiTreeUtil.findChildrenOfType(ktFile, KtCallExpression.class);
+        for (KtCallExpression callExpr : callExpressions) {
+            if (isThreadConstructorCall(callExpr)) {
+                // 检查是否有Lambda参数
+                for (PsiElement arg : callExpr.getValueArguments()) {
+                    if (arg.getFirstChild() instanceof KtLambdaExpression) {
+                        runFunctions.add(arg.getFirstChild());
+                    }
+                }
+            }
+        }
+        
+        return runFunctions;
+    }
+    
+    /**
+     * 检查Kotlin函数是否实现了Runnable接口
+     */
+    private boolean isKotlinRunnableImplementation(KtNamedFunction function) {
+        // 简单实现：检查函数是否有override关键字
+        return function.hasModifier(KtTokens.OVERRIDE_KEYWORD);
+    }
+    
+    /**
+     * 在Kotlin对象表达式中查找run函数
+     */
+    private KtNamedFunction findRunFunctionInKotlinObject(KtObjectLiteralExpression objExpr) {
+        return PsiTreeUtil.findChildOfType(objExpr, KtNamedFunction.class, true);
+    }
+    
+    /**
+     * 检查是否是Thread构造函数调用
+     */
+    private boolean isThreadConstructorCall(KtCallExpression callExpr) {
+        String calleeName = null;
+        PsiElement calleeExpr = callExpr.getCalleeExpression();
+        if (calleeExpr != null) {
+            calleeName = calleeExpr.getText();
+        }
+        return "Thread".equals(calleeName);
+    }
+    
+    /**
+     * 生成Kotlin线程的唯一ID
+     */
+    private String generateKotlinThreadId(PsiElement runElement) {
+        String elementType = runElement.getClass().getSimpleName();
+        threadCounter++;
+        return String.format("KotlinThread_%s_%d_%d", elementType, runElement.getTextOffset(), threadCounter);
+    }
+    
+    /**
+     * 分析Kotlin run函数中的锁操作
+     */
+    private void analyzeKotlinRunFunction(PsiElement runElement, String threadId, Project project) {
+        // 解析所有函数调用，包括synchronized和lock/unlock
+        Collection<KtCallExpression> callExpressions = PsiTreeUtil.findChildrenOfType(runElement, KtCallExpression.class);
+        for (KtCallExpression callExpr : callExpressions) {
+            String methodName = null;
+            PsiElement calleeExpr = callExpr.getCalleeExpression();
+            if (calleeExpr != null) {
+                methodName = calleeExpr.getText();
+            }
+            if (methodName == null) continue;
+            
+            // 1. 处理synchronized函数调用
+            if ("synchronized".equals(methodName)) {
+                handleKotlinSynchronizedCall(callExpr, threadId);
+            }
+            // 2. 处理lock/unlock操作
+            else if ("lock".equals(methodName) || "unlock".equals(methodName) || "tryLock".equals(methodName)) {
+                handleKotlinLockCall(callExpr, methodName, threadId);
+            }
+        }
+    }
+    
+    /**
+     * 处理Kotlin中的synchronized函数调用
+     */
+    private void handleKotlinSynchronizedCall(KtCallExpression callExpr, String threadId) {
+        // 获取synchronized函数的参数
+        List<KtValueArgument> arguments = callExpr.getValueArguments();
+        if (arguments.size() > 0) {
+            // 第一个参数是锁对象
+            KtValueArgument lockArg = arguments.get(0);
+            PsiElement lockExpr = lockArg.getArgumentExpression();
+            if (lockExpr != null) {
+                String lockObject = lockExpr.getText().trim();
+                LockType lockType = LockType.SYNCHRONIZED;
+                
+                // 识别类锁
+                if (lockObject.endsWith(".class")) {
+                    lockType = LockType.CLASS_LOCK;
+                    lockObject = "CLASS_" + lockObject;
+                }
+                
+                System.out.println("Found Kotlin synchronized with lock: " + lockObject);
+                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
+                detector.addProcessHoldsResource(threadId, lockObject, lockType);
+            }
+        }
+    }
+    
+    /**
+     * 处理Kotlin中的锁调用
+     */
+    private void handleKotlinLockCall(KtCallExpression callExpr, String methodName, String threadId) {
+        // 获取锁对象表达式
+        PsiElement receiver = null;
+        PsiElement calleeExpr = callExpr.getCalleeExpression();
+        
+        // 简化实现：对于像 lock.lock() 这样的调用，直接获取锁对象名
+        String callText = callExpr.getText();
+        if (callText.contains(".")) {
+            int dotIndex = callText.indexOf(".");
+            String lockObject = callText.substring(0, dotIndex).trim();
+            LockType lockType = LockType.REENTRANT_LOCK;
+            
+            System.out.println("Found Kotlin lock call: " + methodName + " on " + lockObject);
+            
+            if ("lock".equals(methodName) || "tryLock".equals(methodName)) {
+                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
+                detector.addProcessHoldsResource(threadId, lockObject, lockType);
+            }
+            return;
+        }
+        
+        // 备用方案：尝试从父节点获取
+        if (calleeExpr != null) {
+            receiver = calleeExpr.getPrevSibling();
+        }
+        
+        if (receiver != null) {
+            String lockObject = receiver.getText().trim();
+            LockType lockType = LockType.REENTRANT_LOCK;
+            
+            System.out.println("Found Kotlin lock call: " + methodName + " on " + lockObject);
+            
+            if ("lock".equals(methodName) || "tryLock".equals(methodName)) {
+                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
+                detector.addProcessHoldsResource(threadId, lockObject, lockType);
+            }
+        }
+    }
+    
     /**
      * 提取所有线程相关的run()方法（支持Thread/Runnable/匿名类/Lambda）
      */
