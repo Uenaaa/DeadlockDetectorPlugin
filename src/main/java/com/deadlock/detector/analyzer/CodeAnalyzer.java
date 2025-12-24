@@ -204,7 +204,6 @@ public class CodeAnalyzer {
                 }
                 
                 System.out.println("Found Kotlin synchronized with lock: " + lockObject);
-                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
                 detector.addProcessHoldsResource(threadId, lockObject, lockType);
             }
         }
@@ -228,7 +227,6 @@ public class CodeAnalyzer {
             System.out.println("Found Kotlin lock call: " + methodName + " on " + lockObject);
             
             if ("lock".equals(methodName) || "tryLock".equals(methodName)) {
-                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
                 detector.addProcessHoldsResource(threadId, lockObject, lockType);
             }
             return;
@@ -246,7 +244,6 @@ public class CodeAnalyzer {
             System.out.println("Found Kotlin lock call: " + methodName + " on " + lockObject);
             
             if ("lock".equals(methodName) || "tryLock".equals(methodName)) {
-                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
                 detector.addProcessHoldsResource(threadId, lockObject, lockType);
             }
         }
@@ -586,15 +583,6 @@ public class CodeAnalyzer {
                 detector.addProcessWaitsForResource(threadId, lockObject, lockType);
             } else {
                 System.out.println("First lock for thread: " + threadId + " -> " + lockObject);
-            }
-
-            // 特殊锁对象处理
-            if ("null".equals(lockObject)) {
-                System.out.println("Adding wait for null lock: " + threadId + " -> null");
-                detector.addProcessWaitsForResource(threadId, "null", lockType);
-            } else if (lockObject.startsWith("\"") || lockObject.startsWith("'")) {
-                System.out.println("Adding wait for string lock: " + threadId + " -> " + lockObject);
-                detector.addProcessWaitsForResource(threadId, lockObject, lockType);
             }
 
             // 记录锁持有关系
