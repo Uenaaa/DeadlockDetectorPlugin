@@ -1,59 +1,114 @@
-# DeadLockDetectorPlugin
+🚀 DeadLockDetectorPlugin
 
-这是一个用于检测IntelliJ IDEA/DevEcoStudio并发代码中死锁情况的插件。该插件可以检测用户编写的Java代码中是否存在死锁，并提供死锁检测结果。
+DeadLockDetectorPlugin 是一个用于检测 IntelliJ IDEA/DevEcoStudio 并发代码中死锁情况的智能插件。该插件能够自动分析用户编写的 Java 代码结构，识别线程创建、同步块和锁的获取模式，并通过资源分配图(RAG)和深度优先搜索(DFS)算法精准检测潜在的死锁问题。
 
 ## 功能特点
 
-- **死锁检测**：使用资源分配图(RAG)和深度优先搜索(DFS)算法进行死锁检测
-- **IDE集成**：在IntelliJ IDEA/DevEcoStudio中通过右键菜单触发死锁检测
-- **代码分析**：解析Java代码结构识别线程创建、同步块和锁的获取模式
-- **循环检测**：检测资源分配图中的循环等待条件
+- **智能死锁检测**：采用资源分配图(RAG)和深度优先搜索(DFS)算法，高效检测代码中的死锁条件
+- **无缝 IDE 集成**：在 IntelliJ IDEA/DevEcoStudio 中通过右键菜单即可触发死锁检测
+- **精确代码分析**：基于 Psi API 深入解析 Java 代码结构，支持线程、同步块、Lambda 表达式等复杂语法
+- **直观可视化界面**：提供清晰的死锁检测结果可视化展示，方便用户理解死锁产生的原因
 
 ## 技术实现
 
-- **核心算法**：资源分配图(RAG) + 深度优先搜索(DFS)循环检测
-- **开发框架**：基于IntelliJ IDEA SDK开发的插件
-- **代码分析**：使用Psi API解析Java代码结构（线程、同步块、Lambda表达式等）
-- **构建系统**：基于Gradle和IntelliJ Platform Plugin构建
+### 核心算法
+采用资源分配图(RAG)构建线程与锁的关系网络，结合深度优先搜索(DFS)算法检测循环等待条件，实现高效准确的死锁识别。
+
+### 开发框架
+基于 IntelliJ IDEA SDK 开发的插件，利用 IntelliJ Platform 的强大能力实现与 IDE 的深度集成。
+
+### 代码分析
+使用 Psi API 解析 Java 代码结构，能够识别线程创建、同步块、锁获取释放等关键操作，支持 Lambda 表达式和匿名内部类等现代 Java 特性。
+
+### 构建系统
+基于 Gradle 和 IntelliJ Platform Plugin 构建，提供自动化的编译、测试和打包流程。
+
+## 核心功能实现
+
+### 死锁检测引擎
+实现了资源分配图的构建与管理，支持线程节点和锁节点的创建与关系维护，通过 DFS 算法高效检测资源分配图中的循环等待条件。
+
+### 代码解析模块
+能够自动识别 Java 代码中的线程创建（Thread 类、Runnable 接口、Lambda 表达式）、同步块（synchronized）、锁操作（ReentrantLock 等）等关键结构，提取死锁检测所需的线程和锁信息。
+
+### IDE 集成功能
+提供了直观的右键菜单触发方式，在代码编辑器中即可快速启动死锁检测，并将检测结果以可视化方式呈现给用户。
+
+### 可视化展示
+采用现代简洁的界面设计，清晰展示线程与锁的关系图，突出显示死锁循环，帮助用户直观理解死锁产生的原因和位置。
 
 ## 文件结构
 
 ```
 .
-├── .run/                   # Predefined Run/Debug Configurations
-├── build/                  # Output build directory
+├── .run/                   # 预定义的运行/调试配置
+├── build/                  # 构建输出目录
 ├── gradle
 │   ├── wrapper/            # Gradle Wrapper
-├── src                     # Plugin sources
+├── src                     # 插件源代码
 │   ├── main
-│   │   ├── java/           # Java production sources
-│   │   │   └── com/deadlock/detector/  # Plugin implementation
-│   │   │       ├── action/      # IDE actions
-│   │   │       ├── detector/    # Deadlock detection logic
-│   │   │       └── model/       # Data models
-│   │   └── resources/      # Resources - plugin.xml, icons, messages
+│   │   ├── java/           # Java 生产源代码
+│   │   │   └── com/deadlock/detector/  # 插件实现
+│   │   │       ├── action/      # IDE 操作实现
+│   │   │       ├── detector/    # 死锁检测逻辑
+│   │   │       └── model/       # 数据模型
+│   │   └── resources/      # 资源文件 - plugin.xml, 图标, 消息
 │   │       └── META-INF/
-│   │           └── plugin.xml  # Plugin configuration
-├── .gitignore              # Git ignoring rules
-├── build.gradle.kts        # Gradle build configuration
-├── gradle.properties       # Gradle configuration properties
-├── gradlew                 # *nix Gradle Wrapper script
-├── gradlew.bat             # Windows Gradle Wrapper script
-├── README.md               # README
-└── settings.gradle.kts     # Gradle project settings
+│   │           └── plugin.xml  # 插件配置文件
+├── .gitignore              # Git 忽略规则
+├── build.gradle.kts        # Gradle 构建配置
+├── gradle.properties       # Gradle 配置属性
+├── gradlew                 # *nix Gradle Wrapper 脚本
+├── gradlew.bat             # Windows Gradle Wrapper 脚本
+├── README.md               # 项目说明文档
+└── settings.gradle.kts     # Gradle 项目设置
 ```
 
-## 使用方法
+## 构建、启动与调试
 
-1. 在IntelliJ IDEA/DevEcoStudio中打开该项目
-2. 使用Gradle的`runIde`任务运行插件
-3. 在打开的IDE中编写Java并发代码
+### 构建项目
+
+使用 Gradle 构建插件：
+
+```bash
+./gradlew build
+```
+
+### 运行插件
+
+启动 IntelliJ IDEA 并加载插件：
+
+```bash
+./gradlew runIde
+```
+
+这将启动一个新的 IntelliJ IDEA 实例，自动安装并加载当前开发的插件。
+
+### 构建插件分发包
+
+生成可分发的插件包：
+
+```bash
+./gradlew buildPlugin
+```
+
+构建完成后，插件包将生成在 `build/distributions` 目录下。
+
+### 调试支持
+
+支持通过 IntelliJ IDEA 的预定义运行/调试配置进行插件调试，也可以使用 Gradle 命令行工具启动调试会话。
+
+### 使用方法
+
+1. 在 IntelliJ IDEA/DevEcoStudio 中打开该项目
+2. 运行 `./gradlew runIde` 启动带有插件的 IDE 实例
+3. 在新的 IDE 实例中编写或打开 Java 并发代码
 4. 右键点击代码编辑器，选择"Detect Deadlock"菜单项
-5. 插件会分析代码并显示死锁检测结果
+5. 插件会自动分析代码并显示死锁检测结果
 
 ## 测试用例
 
-项目中包含DeadlockDemo.java测试文件，演示了经典死锁场景：
+项目中包含经典的死锁演示代码 `DeadlockDemo.java`，展示了两个线程互相等待对方持有的锁而产生死锁的典型场景：
 
 ```java
 public class DeadlockDemo {
@@ -87,34 +142,16 @@ public class DeadlockDemo {
 }
 ```
 
-## Plugin Configuration
+## 插件配置
 
-The plugin configuration file is located at `src/main/resources/META-INF/plugin.xml`. It provides general information about the plugin, its dependencies, extensions, and listeners.
+插件配置文件位于 `src/main/resources/META-INF/plugin.xml`，包含插件的基本信息、依赖关系、扩展点和监听器配置。
 
-## Running the Plugin
-
-Use the predefined Run/Debug configurations or run the following Gradle task:
-
-```bash
-./gradlew runIde
-```
-
-This will start a new instance of IntelliJ IDEA with the plugin installed.
-
-## Building the Plugin
-
-To build the plugin distribution:
-
-```bash
-./gradlew buildPlugin
-```
-
-The distribution will be created in the `build/distributions` directory.
-
-## 作者
+## 项目参与人员
 
 Uenaaa
 
 ## 许可证
 
 MIT License
+
+欢迎学习和使用本项目，用于教学、研究和实验并发编程的死锁检测技术 🚀
